@@ -1,29 +1,32 @@
 use roles_logic_sv2::bitcoin::consensus;
+use std::path::Path;
 
+/// Error type for [`crate::BitcoinCoreSv2`]
 #[derive(Debug)]
-pub enum Sv2BitcoinCoreError {
+pub enum BitcoinCoreSv2Error {
     CapnpError(capnp::Error),
-    IoError(std::io::Error),
+    CannotConnectToUnixSocket(Box<Path>),
     InvalidTemplateHeader(consensus::encode::Error),
     InvalidTemplateHeaderLength,
-    InvalidBlockStructure,
+    FailedToSerializeCoinbasePrefix,
+    FailedToSerializeCoinbaseOutputs,
     TemplateNotFound,
+    FailedToSendNewTemplateMessage,
+    FailedToSendSetNewPrevHashMessage,
+    FailedToSendRequestTransactionDataResponseMessage,
+    FailedToRecvTemplateDistributionMessage,
+    FailedToSendTemplateDistributionMessage,
+    FailedToSubmitSolution,
 }
 
-impl From<capnp::Error> for Sv2BitcoinCoreError {
+impl From<capnp::Error> for BitcoinCoreSv2Error {
     fn from(error: capnp::Error) -> Self {
-        Sv2BitcoinCoreError::CapnpError(error)
+        BitcoinCoreSv2Error::CapnpError(error)
     }
 }
 
-impl From<std::io::Error> for Sv2BitcoinCoreError {
-    fn from(error: std::io::Error) -> Self {
-        Sv2BitcoinCoreError::IoError(error)
-    }
-}
-
-impl From<consensus::encode::Error> for Sv2BitcoinCoreError {
+impl From<consensus::encode::Error> for BitcoinCoreSv2Error {
     fn from(error: consensus::encode::Error) -> Self {
-        Sv2BitcoinCoreError::InvalidTemplateHeader(error)
+        BitcoinCoreSv2Error::InvalidTemplateHeader(error)
     }
 }
