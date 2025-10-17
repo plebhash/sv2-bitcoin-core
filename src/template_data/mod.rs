@@ -5,7 +5,7 @@ use bitcoin_capnp::{
     proxy_capnp::thread::Client as ThreadIpcClient,
 };
 use error::TemplateDataError;
-use roles_logic_sv2::bitcoin::{
+use bitcoin::{
     Target, Transaction, TxOut,
     amount::{Amount, CheckedSum},
     block::{Block, Header, Version},
@@ -37,6 +37,23 @@ impl TemplateData {
             block,
             template_ipc_client,
         }
+    }
+
+    pub async fn destroy_ipc_client(
+        &self,
+        thread_ipc_client: ThreadIpcClient,
+    ) -> Result<(), TemplateDataError> {
+        tracing::debug!("Destroying template IPC client: {}", self.template_id);
+        let mut destroy_ipc_client_request = self.template_ipc_client.destroy_request();
+        let destroy_ipc_client_request_params = destroy_ipc_client_request.get();
+
+        destroy_ipc_client_request_params
+            .get_context()?
+            .set_thread(thread_ipc_client);
+
+        destroy_ipc_client_request.send().promise.await?;
+
+        Ok(())
     }
 
     pub fn get_template_id(&self) -> u64 {
@@ -110,6 +127,7 @@ impl TemplateData {
             prev_blockhash: self.block.header.prev_blockhash,
             merkle_root: {
                 let mut tmp_block = self.block.clone();
+                // replace dummy coinbase tx with the actual coinbase tx from the solution
                 tmp_block.txdata[0] = coinbase_tx;
                 tmp_block
                     .compute_merkle_root()

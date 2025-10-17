@@ -21,3 +21,4 @@ template_distribution_sv2 = { version = "^4.0.0" }
 binary_sv2 = { version = "^4.0.0" }
 parsers_sv2 = { version = "^0.1.0" }
 roles_logic_sv2 = { version = "^4.0.0" }
+bitcoin = "0.32.5"

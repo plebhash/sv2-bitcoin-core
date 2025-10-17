@@ -1,4 +1,4 @@
-use roles_logic_sv2::bitcoin::consensus;
+use bitcoin::consensus;
 use std::path::Path;
 
 /// Error type for [`crate::BitcoinCoreSv2`]

@@ -184,6 +184,7 @@ version = "0.1.0"
 dependencies = [
  "async-channel",
  "binary_sv2",
+ "bitcoin",
  "bitcoin-capnp",
  "capnp",
  "capnp-rpc",
