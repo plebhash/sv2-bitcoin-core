@@ -1,7 +1,6 @@
 use crate::BitcoinCoreSv2;
 
 use crate::error::BitcoinCoreSv2Error;
-use std::sync::atomic::Ordering;
 use stratum_core::{
     parsers_sv2::TemplateDistribution,
     template_distribution_sv2::{
@@ -41,17 +40,6 @@ impl BitcoinCoreSv2 {
 
         self.template_ipc_client_cancellation_token = CancellationToken::new();
         tracing::debug!("Created new template_ipc_client_cancellation_token");
-
-        // todo: remove this once https://github.com/bitcoin/bitcoin/issues/33575 is implemented
-        self.coinbase_output_constraints_counter
-            .fetch_add(1, Ordering::SeqCst);
-        let new_count = self
-            .coinbase_output_constraints_counter
-            .load(Ordering::SeqCst);
-        tracing::debug!(
-            "coinbase_output_constraints_counter incremented to: {}",
-            new_count
-        );
 
         tracing::debug!("Spawning new monitor_ipc_templates() task");
         self.monitor_ipc_templates();

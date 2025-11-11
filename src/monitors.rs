@@ -1,6 +1,6 @@
 use crate::BitcoinCoreSv2;
 
-use std::{collections::HashSet, sync::atomic::Ordering};
+use std::collections::HashSet;
 use stratum_core::parsers_sv2::TemplateDistribution;
 use tracing::info;
 
@@ -100,61 +100,27 @@ impl BitcoinCoreSv2 {
                 // it's just the max time we'll wait for the current waitNext request to complete
                 wait_next_request_options.set_timeout(10_000.0);
 
-                // todo: remove this once https://github.com/bitcoin/bitcoin/issues/33575 is implemented
-                self_clone
-                    .wait_next_request_counter
-                    .fetch_add(1, Ordering::SeqCst);
-                tracing::debug!(
-                    "waitNext request starting - counter incremented to: {}",
-                    self_clone.wait_next_request_counter.load(Ordering::SeqCst)
-                );
-
-                // todo: remove this once https://github.com/bitcoin/bitcoin/issues/33575 is implemented
-                let current_coinbase_output_constraints_count = self_clone
-                    .coinbase_output_constraints_counter
-                    .load(Ordering::SeqCst);
-                tracing::debug!(
-                    "Captured current_coinbase_output_constraints_count: {}",
-                    current_coinbase_output_constraints_count
-                );
-
                 tokio::select! {
-                    // // todo: re-enable this once https://github.com/bitcoin/bitcoin/issues/33575 is implemented
-                    // // and also cancel the wait_next_request
-                    // _ = self_clone.global_cancellation_token.cancelled() => {
-                    //     tracing::warn!("Exiting mempool change monitoring loop");
-                    //     break;
-                    // }
-                    // // todo: remove this once https://github.com/bitcoin/bitcoin/issues/33575 is implemented
-                    // // and also cancel the wait_next_request
-                    // _ = self_clone.template_ipc_client_cancellation_token.cancelled() => {
-                    //     tracing::debug!("template cancellation token activated");
-                    //     break;
-                    // }
+                    _ = self_clone.global_cancellation_token.cancelled() => {
+                        let interrupt_wait_request = template_ipc_client.interrupt_wait_request();
+                        let _interrupt_wait_request_response = interrupt_wait_request.send().promise.await;
+                        tracing::debug!("Interrupted waitNext request");
+                        
+                        tracing::warn!("Exiting mempool change monitoring loop");
+                        break;
+                    }
+                    _ = self_clone.template_ipc_client_cancellation_token.cancelled() => {
+                        let interrupt_wait_request = template_ipc_client.interrupt_wait_request();
+                        let _interrupt_wait_request_response = interrupt_wait_request.send().promise.await;
+                        tracing::debug!("Interrupted waitNext request");
+
+                        tracing::debug!("Exiting mempool change monitoring loop");
+                        break;
+                    }
                     wait_next_request_response = wait_next_request.send().promise => {
                         tracing::debug!("waitNext request completed");
                         match wait_next_request_response {
                             Ok(response) => {
-                                // todo: remove this once https://github.com/bitcoin/bitcoin/issues/33575 is implemented
-                                // see https://github.com/stratum-mining/sv2-apps/issues/81 for more details
-                                {
-                                    self_clone.wait_next_request_counter.fetch_sub(1, Ordering::SeqCst);
-                                    tracing::debug!("waitNext request succeeded - counter decremented to: {}",
-                                        self_clone.wait_next_request_counter.load(Ordering::SeqCst));
-
-                                    let coinbase_output_constraints_count = self_clone.coinbase_output_constraints_counter.load(Ordering::SeqCst);
-                                    let coinbase_output_constraints_changed = coinbase_output_constraints_count != current_coinbase_output_constraints_count;
-                                    tracing::debug!("waitNext timeout check - current_count: {}, captured_count: {}, changed: {}",
-                                        coinbase_output_constraints_count,
-                                        current_coinbase_output_constraints_count,
-                                        coinbase_output_constraints_changed);
-
-                                    if self_clone.global_cancellation_token.is_cancelled() || coinbase_output_constraints_changed {
-                                        tracing::debug!("Breaking monitor_ipc_templates loop - cancellation or constraints changed");
-                                        break;
-                                    }
-                                }
-
                                 let result = match response.get() {
                                     Ok(result) => result,
                                     Err(e) => {

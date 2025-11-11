@@ -92,7 +92,7 @@ use std::{
     collections::{HashMap, HashSet},
     path::Path,
     rc::Rc,
-    sync::atomic::{AtomicU8, AtomicU32, AtomicU64, Ordering},
+    sync::atomic::{AtomicU64, Ordering},
 };
 use stratum_core::{
     binary_sv2::U256,
@@ -101,7 +101,7 @@ use stratum_core::{
 };
 
 use std::sync::RwLock;
-use tokio::{net::UnixStream, sync::Mutex};
+use tokio::net::UnixStream;
 use tokio_util::compat::*;
 pub use tokio_util::sync::CancellationToken;
 use tracing::info;
@@ -149,12 +149,6 @@ pub struct BitcoinCoreSv2 {
     mining_ipc_client: MiningIpcClient,
     current_template_ipc_client: Rc<RefCell<Option<BlockTemplateIpcClient>>>,
     current_prev_hash: Rc<RefCell<Option<U256<'static>>>>,
-    // todo: remove this once https://github.com/bitcoin/bitcoin/issues/33575 is implemented
-    wait_next_request_counter: Rc<AtomicU8>,
-    // todo: remove this once https://github.com/bitcoin/bitcoin/issues/33575 is implemented
-    coinbase_output_constraints_counter: Rc<AtomicU32>,
-    // todo: remove this once https://github.com/bitcoin/bitcoin/issues/33575 is implemented
-    template_lock: Rc<Mutex<()>>,
     template_data: Rc<RwLock<HashMap<u64, TemplateData>>>,
     stale_template_ids: Rc<RwLock<HashSet<u64>>>,
     template_id_factory: Rc<AtomicU64>,
@@ -228,10 +222,7 @@ impl BitcoinCoreSv2 {
             thread_map,
             thread_ipc_client,
             mining_ipc_client,
-            wait_next_request_counter: Rc::new(AtomicU8::new(0)),
-            coinbase_output_constraints_counter: Rc::new(AtomicU32::new(0)),
             template_id_factory: Rc::new(AtomicU64::new(0)),
-            template_lock: Rc::new(Mutex::new(())),
             current_template_ipc_client: Rc::new(RefCell::new(None)),
             current_prev_hash: Rc::new(RefCell::new(None)),
             template_data: Rc::new(RwLock::new(HashMap::new())),
@@ -290,10 +281,6 @@ impl BitcoinCoreSv2 {
                             let mut current_template_ipc_client_guard = self.current_template_ipc_client.borrow_mut();
                             *current_template_ipc_client_guard = Some(template_ipc_client);
                             tracing::debug!("Set current_template_ipc_client to initial template");
-
-                            self.coinbase_output_constraints_counter.fetch_add(1, Ordering::SeqCst);
-                            tracing::debug!("coinbase_output_constraints_counter incremented to: {}",
-                                self.coinbase_output_constraints_counter.load(Ordering::SeqCst));
 
                             break;
                         }
@@ -409,54 +396,11 @@ impl BitcoinCoreSv2 {
         // block until the global cancellation token is activated
         tracing::debug!("run() entering main blocking wait for global_cancellation_token");
         self.global_cancellation_token.cancelled().await;
-        tracing::debug!("global_cancellation_token cancelled - beginning shutdown sequence");
 
-        // todo: remove this once https://github.com/bitcoin/bitcoin/issues/33575 is implemented
-        // wait until all waitNext requests are completed
-        let start_time = std::time::Instant::now();
-        tracing::debug!(
-            "Shutdown: Starting waitNext completion loop - initial counter: {}",
-            self.wait_next_request_counter.load(Ordering::SeqCst)
-        );
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            tracing::info!("Waiting for waitNext requests to complete...");
-
-            let now = std::time::Instant::now();
-            let counter_value = self.wait_next_request_counter.load(Ordering::SeqCst);
-            let elapsed = now.duration_since(start_time).as_secs();
-
-            tracing::debug!(
-                "wait_next_request_counter: {}",
-                self.wait_next_request_counter.load(Ordering::SeqCst)
-            );
-            tracing::debug!(
-                "Shutdown: wait_next_request_counter={}, elapsed={}s",
-                counter_value,
-                elapsed
-            );
-
-            if counter_value == 0 || elapsed > 50 {
-                if counter_value == 0 {
-                    tracing::info!("All waitNext requests completed... finally ready to exit!");
-                    tracing::debug!("Shutdown: Clean exit - all waitNext requests completed");
-                } else {
-                    tracing::info!("Timed out after 50 seconds... finally ready to exit!");
-                    tracing::debug!(
-                        "Shutdown: Timeout exit - counter still at {} after 50s",
-                        counter_value
-                    );
-                }
-                break;
-            }
-        }
         tracing::debug!("run() exiting");
     }
 
     async fn fetch_template_data(&self) -> Result<TemplateData, BitcoinCoreSv2Error> {
-        // todo: remove this once https://github.com/bitcoin/bitcoin/issues/33575 is implemented
-        let template_lock_guard = self.template_lock.lock().await;
-
         tracing::debug!("Fetching template data over IPC");
         let template_id = self.template_id_factory.fetch_add(1, Ordering::Relaxed);
         tracing::debug!(
@@ -503,9 +447,6 @@ impl BitcoinCoreSv2 {
         // Create the template data structure
         let template_data = TemplateData::new(template_id, block, template_ipc_client);
         tracing::debug!("TemplateData created successfully");
-
-        // todo: remove this once https://github.com/bitcoin/bitcoin/issues/33575 is implemented
-        drop(template_lock_guard);
 
         Ok(template_data)
     }

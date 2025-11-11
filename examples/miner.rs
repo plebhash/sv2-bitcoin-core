@@ -158,6 +158,7 @@ async fn main() {
         new_template,
         set_new_prev_hash,
         request_transaction_data_success,
+        cancellation_token.clone(),
     );
 
     // send the `SubmitSolution` message to the `BitcoinCoreSv2` instance
@@ -185,6 +186,7 @@ fn find_solution(
     new_template: NewTemplate<'_>,
     set_new_prev_hash: SetNewPrevHash<'_>,
     request_transaction_data_success: RequestTransactionDataSuccess<'_>,
+    cancellation_token: CancellationToken,
 ) -> SubmitSolution<'static> {
     let mut txdata: Vec<Transaction> = request_transaction_data_success
         .transaction_list
@@ -239,6 +241,10 @@ fn find_solution(
 
     // find the nonce that satisfies the PoW requirement of a valid block
     loop {
+        if cancellation_token.is_cancelled() {
+            tracing::warn!("Cancellation token activated");
+            break;
+        }
         nonce = nonce.wrapping_add(1);
         header.nonce = nonce;
         if header.validate_pow(header.target()).is_ok() {

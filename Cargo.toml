@@ -12,7 +12,10 @@ keywords = ["stratum", "mining", "bitcoin", "bitcoin-core"]
 [dependencies]
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
-bitcoin-capnp-types = { git = "https://github.com/2140-dev/bitcoin-capnp-types", rev="2ccda4c10554a204188d563eab707a8d07334b52" }
+#bitcoin-capnp-types = { git = "https://github.com/2140-dev/bitcoin-capnp-types", rev="2ccda4c10554a204188d563eab707a8d07334b52" }
+
+# use a fork with updated interfaces from https://github.com/bitcoin/bitcoin/pull/33676
+bitcoin-capnp-types = { path = "/Users/plebhash/develop/bitcoin-capnp" }
 capnp = "0.21.4"
 capnp-rpc = "0.21.0"
 tokio = { version = "1.44.1", features = ["full"] }
