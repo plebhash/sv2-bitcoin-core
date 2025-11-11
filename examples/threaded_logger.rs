@@ -1,4 +1,9 @@
-//! A simple example of how to use `BitcoinCoreSv2`.
+//! A simple example of how to use `BitcoinCoreSv2` with a dedicated thread.
+//!
+//! This example demonstrates the pattern used in pool applications where `BitcoinCoreSv2` is
+//! spawned in a dedicated thread with its own Tokio runtime and `LocalSet`. This allows the
+//! main application to run in a separate async context while `BitcoinCoreSv2` runs in its
+//! own isolated thread.
 //!
 //! We connect to the Bitcoin Core UNIX socket, and log the received Sv2 Template Distribution
 //! Protocol messages.
@@ -43,6 +48,49 @@ async fn main() {
     let (msg_sender_into_bitcoin_core_sv2, msg_receiver_into_bitcoin_core_sv2) = unbounded();
     // these messages are received from the `BitcoinCoreSv2` instance
     let (msg_sender_from_bitcoin_core_sv2, msg_receiver_from_bitcoin_core_sv2) = unbounded();
+
+    // clone so we can move it into the thread
+    let cancellation_token_clone = cancellation_token.clone();
+    let bitcoin_core_unix_socket_path_clone = bitcoin_core_unix_socket_path.to_path_buf();
+
+    // spawn a dedicated thread to run the BitcoinCoreSv2 instance
+    // because we're limited to tokio::task::LocalSet
+    std::thread::spawn(move || {
+        // we need a dedicated runtime so we can spawn an async task inside the LocalSet
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => {
+                tracing::error!("Failed to create Tokio runtime: {:?}", e);
+                cancellation_token_clone.cancel();
+                return;
+            }
+        };
+        let tokio_local_set = tokio::task::LocalSet::new();
+
+        tokio_local_set.block_on(&rt, async move {
+            // create a new `BitcoinCoreSv2` instance
+            let mut sv2_bitcoin_core = match BitcoinCoreSv2::new(
+                &bitcoin_core_unix_socket_path_clone,
+                fee_threshold,
+                msg_receiver_into_bitcoin_core_sv2,
+                msg_sender_from_bitcoin_core_sv2,
+                cancellation_token_clone.clone(),
+            )
+            .await
+            {
+                Ok(sv2_bitcoin_core) => sv2_bitcoin_core,
+                Err(e) => {
+                    tracing::error!("Failed to create BitcoinCoreToSv2: {:?}", e);
+                    cancellation_token_clone.cancel();
+                    return;
+                }
+            };
+
+            // run the `BitcoinCoreSv2` instance, which will block until the cancellation token is
+            // activated
+            sv2_bitcoin_core.run().await;
+        });
+    });
 
     // clone so we can move it
     let cancellation_token_clone = cancellation_token.clone();
@@ -132,33 +180,7 @@ async fn main() {
         }
     });
 
-    // `capnp` clients are not `Send`, so we need to use a `LocalSet` to run them
-    let tokio_local_set = tokio::task::LocalSet::new();
-
-    // run the BitcoinCoreSv2 instance inside a LocalSet
-    tokio_local_set
-        .run_until(async move {
-            // create a new `BitcoinCoreSv2` instance
-            let mut sv2_bitcoin_core = match BitcoinCoreSv2::new(
-                Path::new(&bitcoin_core_unix_socket_path),
-                fee_threshold,
-                msg_receiver_into_bitcoin_core_sv2,
-                msg_sender_from_bitcoin_core_sv2,
-                cancellation_token.clone(),
-            )
-            .await
-            {
-                Ok(sv2_bitcoin_core) => sv2_bitcoin_core,
-                Err(e) => {
-                    tracing::error!("Failed to create BitcoinCoreToSv2: {:?}", e);
-                    cancellation_token.cancel();
-                    return;
-                }
-            };
-
-            // run the `BitcoinCoreSv2` instance,
-            // which will block until the cancellation token is activated
-            sv2_bitcoin_core.run().await;
-        })
-        .await;
+    // wait for the cancellation token to be activated
+    cancellation_token.cancelled().await;
+    info!("Shutting down...");
 }

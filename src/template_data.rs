@@ -1,11 +1,10 @@
-mod error;
+use crate::error::TemplateDataError;
 
-use bitcoin_capnp::{
+use bitcoin_capnp_types::{
     mining_capnp::block_template::Client as BlockTemplateIpcClient,
     proxy_capnp::thread::Client as ThreadIpcClient,
 };
-use error::TemplateDataError;
-use bitcoin::{
+use stratum_core::bitcoin::{
     Target, Transaction, TxOut,
     amount::{Amount, CheckedSum},
     block::{Block, Header, Version},
@@ -13,9 +12,11 @@ use bitcoin::{
     hashes::{Hash, HashEngine, sha256d},
 };
 
-use binary_sv2::{B016M, B064K, B0255, Seq064K, Seq0255, U256};
-use template_distribution_sv2::{
-    NewTemplate, RequestTransactionDataSuccess, SetNewPrevHash, SubmitSolution,
+use stratum_core::{
+    binary_sv2::{B016M, B064K, B0255, Seq064K, Seq0255, U256},
+    template_distribution_sv2::{
+        NewTemplate, RequestTransactionDataSuccess, SetNewPrevHash, SubmitSolution,
+    },
 };
 
 #[derive(Clone)]
@@ -171,7 +172,7 @@ impl TemplateData {
         self.block.header.bits.to_consensus()
     }
 
-    fn get_target(&self) -> U256 {
+    fn get_target(&self) -> U256<'_> {
         let target = Target::from(self.block.header.bits);
         let target_bytes: [u8; 32] = target.to_le_bytes();
         U256::from(target_bytes)
@@ -198,7 +199,7 @@ impl TemplateData {
             .expect("coinbase version conversion to u32 should never fail")
     }
 
-    fn get_coinbase_script_sig(&self) -> B0255 {
+    fn get_coinbase_script_sig(&self) -> B0255<'_> {
         let coinbase_script_sig: B0255 = self.block.txdata[0].input[0]
             .script_sig
             .to_bytes()
@@ -220,7 +221,7 @@ impl TemplateData {
             .collect()
     }
 
-    fn get_serialized_empty_coinbase_outputs(&self) -> B064K {
+    fn get_serialized_empty_coinbase_outputs(&self) -> B064K<'_> {
         let empty_coinbase_outputs = self.get_empty_coinbase_outputs();
         let mut serialized_empty_coinbase_outputs = Vec::new();
         for output in empty_coinbase_outputs {
@@ -246,7 +247,7 @@ impl TemplateData {
         self.block.txdata[0].lock_time.to_consensus_u32()
     }
 
-    fn get_tx_data(&self) -> Seq064K<B016M<'static>> {
+    fn get_tx_data(&self) -> Seq064K<'_, B016M<'static>> {
         let tx_data: Vec<B016M<'static>> = self
             .block
             .txdata
@@ -260,7 +261,7 @@ impl TemplateData {
         Seq064K::new(tx_data).expect("tx data should always be valid for Seq064K")
     }
 
-    fn get_merkle_path(&self) -> Seq0255<U256> {
+    fn get_merkle_path(&self) -> Seq0255<'_, U256<'_>> {
         let tx_hashes: Vec<sha256d::Hash> = self
             .block
             .txdata
