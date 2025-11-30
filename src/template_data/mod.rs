@@ -1,6 +1,6 @@
 mod error;
 
-use bitcoin_capnp::{
+use bitcoin_capnp_types::{
     mining_capnp::block_template::Client as BlockTemplateIpcClient,
     proxy_capnp::thread::Client as ThreadIpcClient,
 };

@@ -17,6 +17,8 @@ pub enum BitcoinCoreSv2Error {
     FailedToRecvTemplateDistributionMessage,
     FailedToSendTemplateDistributionMessage,
     FailedToSubmitSolution,
+    FailedToInterruptWaitNextRequest,
+    TemplateIpcClientNotFound,
 }
 
 impl From<capnp::Error> for BitcoinCoreSv2Error {

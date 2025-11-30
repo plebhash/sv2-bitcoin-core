@@ -9,7 +9,7 @@ pub mod error;
 use crate::template_data::TemplateData;
 use async_channel::{Receiver, Sender};
 use binary_sv2::U256;
-use bitcoin_capnp::{
+use bitcoin_capnp_types::{
     init_capnp::init::Client as InitIpcClient,
     mining_capnp::{
         block_template::Client as BlockTemplateIpcClient, mining::Client as MiningIpcClient,
@@ -268,6 +268,18 @@ impl BitcoinCoreSv2 {
         self.global_cancellation_token.cancelled().await;
     }
 
+    async fn interrupt_wait_next_request(&self) -> Result<(), BitcoinCoreSv2Error> {
+        let template_ipc_client = self.current_template_ipc_client.borrow().clone();
+
+        let interrupt_wait_request = template_ipc_client.interrupt_wait_request();
+        if let Err(e) = interrupt_wait_request.send().promise.await {
+            tracing::error!("Failed to interrupt waitNext request: {:?}", e);
+            return Err(BitcoinCoreSv2Error::FailedToInterruptWaitNextRequest);
+        }
+
+        Ok(())
+    }
+
     fn monitor_ipc_templates(&self) {
         let self_clone = self.clone();
 
@@ -308,6 +320,7 @@ impl BitcoinCoreSv2 {
                         break;
                     }
                     _ = self_clone.template_ipc_client_cancellation_token.cancelled() => {
+                        let _ = self_clone.interrupt_wait_next_request().await;
                         tracing::debug!("template cancellation token activated");
                         break;
                     }

@@ -11,7 +11,6 @@ keywords = ["stratum", "mining", "bitcoin", "bitcoin-core"]
 [dependencies]
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
-bitcoin-capnp = { git = "https://github.com/rustaceanrob/bitcoin-capnp", rev="a03a8408657938cf13803a0d582fa4edf604383e" }
 capnp = "0.21.4"
 capnp-rpc = "0.21.0"
 tokio = { version = "1.44.1", features = ["full"] }
@@ -21,3 +20,6 @@ template_distribution_sv2 = { version = "^4.0.0" }
 binary_sv2 = { version = "^4.0.0" }
 parsers_sv2 = { version = "^0.1.0" }
 roles_logic_sv2 = { version = "^4.0.0" }
+
+# interruptWait
+bitcoin-capnp-types = { git = "https://github.com/stratum-mining/bitcoin-capnp-types", branch = "interruptWait" }

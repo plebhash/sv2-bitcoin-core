@@ -143,9 +143,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "bitcoin-capnp"
+name = "bitcoin-capnp-types"
 version = "0.1.0"
-source = "git+https://github.com/rustaceanrob/bitcoin-capnp?rev=a03a8408657938cf13803a0d582fa4edf604383e#a03a8408657938cf13803a0d582fa4edf604383e"
+source = "git+https://github.com/stratum-mining/bitcoin-capnp-types?branch=interruptWait#f8f07c72cc19044c65690aa0f6c12d58c57d474f"
 dependencies = [
  "capnp",
  "capnpc",
@@ -184,7 +184,7 @@ version = "0.1.0"
 dependencies = [
  "async-channel",
  "binary_sv2",
- "bitcoin-capnp",
+ "bitcoin-capnp-types",
  "capnp",
  "capnp-rpc",
  "parsers_sv2",
