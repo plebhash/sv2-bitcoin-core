@@ -1,24 +1,23 @@
 [package]
-name = "sv2-bitcoin-core"
-description = "A library to get Stratum V2 Template Distribution Protocol from Bitcoin Core IPC"
+name = "bitcoin-core-bench"
 version = "0.1.0"
 edition = "2021"
-license = "MIT OR Apache-2.0"
-authors = ["The Stratum V2 Developers"]
-homepage = "https://stratumprotocol.org"
-keywords = ["stratum", "mining", "bitcoin", "bitcoin-core"]
+publish = false
 
 [dependencies]
-async-channel = "1.5.1"
-capnp = "0.21.4"
-capnp-rpc = "0.21.0"
 tokio = { version = "1.44.1", features = ["full"] }
 tokio-util = { version = "0.7.10", features = ["codec", "compat"] }
-tracing = "0.1.41"
-tracing-subscriber = "0.3.19"
-template_distribution_sv2 = "3.1.0"
-binary_sv2 = "3.0.0"
-roles_logic_sv2 = "3.0.0"
+capnp = "0.21.4"
+capnp-rpc = "0.21.0"
+bitcoin = "0.32.5"
+anyhow = "1.0"
 
-[build-dependencies]
-capnpc = "0.21.2"
+bitcoin-capnp-types = { git = "https://github.com/2140-dev/bitcoin-capnp-types", rev = "77a609a0058478d6c8aad24351b6baeb3e0555fc" }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["async_tokio"] }
+
+[[bench]]
+name = "fetch_template_bench"
+harness = false
+
